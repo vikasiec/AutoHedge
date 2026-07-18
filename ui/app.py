@@ -106,7 +106,13 @@ def render_run_tab() -> None:
             return
 
         for r in results:
-            ticker = r.get("ticker", "?")
+            if "ticker" not in r:
+                # A pipeline-level failure before any ticker was even
+                # identified (e.g. ticker discovery itself failed).
+                st.error(r.get("error", "Run failed for an unknown reason."))
+                continue
+
+            ticker = r["ticker"]
             status = r.get("status", r.get("error", "unknown"))
             with st.expander(f"{ticker} -- {status}", expanded=True):
                 if "error" in r:

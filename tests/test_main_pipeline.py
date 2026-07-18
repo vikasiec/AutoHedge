@@ -158,6 +158,32 @@ class TestAutoHedgePipeline(unittest.TestCase):
         self.assertIn("exceeds approved position size", results[0]["error"])
         self.assertFalse(self.system.portfolio.has_position("NVDA"))
 
+    @patch("autohedge.main.ticker_discovery_agent")
+    def test_ticker_discovery_failure_surfaces_the_real_reason(
+        self, mock_discovery
+    ):
+        # Reproduces a real failure: the LLM call itself raised (e.g. a
+        # rate limit), and run() used to swallow this into a silent
+        # empty list with no indication of why.
+        mock_discovery.run.side_effect = RuntimeError("429 rate limited")
+
+        results = self.system.run("Analyze NVDA")
+
+        self.assertEqual(len(results), 1)
+        self.assertIn("error", results[0])
+        self.assertIn("rate limited", results[0]["error"])
+
+    @patch("autohedge.main.ticker_discovery_agent")
+    def test_empty_ticker_list_surfaces_a_reason_not_silence(
+        self, mock_discovery
+    ):
+        mock_discovery.run.return_value = "[]"
+
+        results = self.system.run("Analyze the weather")
+
+        self.assertEqual(len(results), 1)
+        self.assertIn("error", results[0])
+
 
 if __name__ == "__main__":
     unittest.main()

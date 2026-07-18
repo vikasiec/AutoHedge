@@ -29,6 +29,10 @@ from autohedge.prompts import (
 _PRICE_TOLERANCE = 0.02  # allow 2% drift between quant's quote and a fresh fetch
 
 
+class TickerDiscoveryError(RuntimeError):
+    pass
+
+
 class AutoHedge:
     """
     Paper-trading research pipeline: Director (thesis) -> Quant (grounded
@@ -61,15 +65,27 @@ class AutoHedge:
         logger.info("AutoHedge initialized (paper trading mode)")
 
     def discover_tickers(self, task: str) -> list[str]:
-        raw = ticker_discovery_agent.run(task=task)
+        """
+        Raises TickerDiscoveryError with a specific, user-facing reason
+        (LLM call failed, e.g. rate limit; vs. LLM answered but not with
+        a valid ticker list) instead of failing silently -- callers used
+        to see an unexplained empty list either way.
+        """
+        try:
+            raw = ticker_discovery_agent.run(task=task)
+        except Exception as e:
+            raise TickerDiscoveryError(f"LLM call failed: {e}") from e
+
         try:
             tickers = extract_json(str(raw))
         except JsonParseError as e:
-            logger.error("Ticker discovery failed to parse: {}", e)
-            return []
+            raise TickerDiscoveryError(
+                f"model did not return a valid ticker list: {e}"
+            ) from e
         if not isinstance(tickers, list):
-            logger.error("Ticker discovery did not return a list: {}", tickers)
-            return []
+            raise TickerDiscoveryError(
+                f"model did not return a list, got: {tickers!r}"
+            )
         return [str(t).strip().upper() for t in tickers if str(t).strip()]
 
     def _run_cycle_for_ticker(self, task: str, ticker: str) -> dict:
@@ -188,10 +204,22 @@ class AutoHedge:
 
     def run(self, task: str) -> list[dict]:
         logger.info("Starting trading cycle: {}", task)
-        tickers = self.discover_tickers(task)
+        try:
+            tickers = self.discover_tickers(task)
+        except TickerDiscoveryError as e:
+            logger.error("Ticker discovery failed: {}", e)
+            return [{"error": f"ticker discovery failed: {e}"}]
+
         if not tickers:
-            logger.warning("No tickers discovered for task: {}", task)
-            return []
+            logger.warning(
+                "Ticker discovery returned no tickers for task: {}", task
+            )
+            return [
+                {
+                    "error": "no tickers were relevant to this task "
+                    "(the model returned an empty list)"
+                }
+            ]
 
         results = [
             self._run_cycle_for_ticker(task, ticker) for ticker in tickers
