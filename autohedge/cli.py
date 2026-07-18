@@ -10,9 +10,11 @@ from rich.console import Console
 from rich.panel import Panel
 from rich.text import Text
 from rich.columns import Columns
+from rich.table import Table
 from rich import box
 
 from autohedge.env_loader import load_env, require_openai_key
+from autohedge.portfolio import PaperPortfolio
 
 load_env()
 if not require_openai_key():
@@ -40,6 +42,8 @@ BANNER_ART = r"""
 
 TIPS = [
     "Enter a task prompt to run (e.g. 'Analyze NVDA for 50k allocation')",
+    "Type 'portfolio' to view paper trading state",
+    "Type 'history' to view recent paper trades",
     "Type 'quit' or 'exit' to leave",
     "Type 'help' or '?' for commands",
 ]
@@ -141,6 +145,58 @@ def _welcome() -> None:
     )
 
 
+def _load_portfolio() -> PaperPortfolio:
+    return PaperPortfolio(path="outputs/portfolio.json")
+
+
+def _print_portfolio() -> None:
+    pf = _load_portfolio()
+    equity = pf.total_equity()
+    console.print(
+        Panel(
+            f"Cash: ${pf.cash:,.2f}   Equity: ${equity:,.2f}   "
+            f"Today's P&L: ${pf.daily_pnl():+,.2f}",
+            title="Paper Portfolio",
+            border_style="cyan",
+        )
+    )
+    if not pf.positions:
+        console.print("[dim]No open positions.[/]")
+        return
+    table = Table(box=box.SIMPLE)
+    for col in ("Ticker", "Qty", "Avg Price", "Last Price", "Unrealized P&L"):
+        table.add_column(col)
+    for pos in pf.positions.values():
+        table.add_row(
+            pos.ticker,
+            f"{pos.quantity:g}",
+            f"${pos.avg_price:,.2f}",
+            f"${pos.last_price:,.2f}" if pos.last_price else "-",
+            f"${pos.unrealized_pnl():+,.2f}",
+        )
+    console.print(table)
+
+
+def _print_history(limit: int = 20) -> None:
+    pf = _load_portfolio()
+    if not pf.history:
+        console.print("[dim]No trades yet.[/]")
+        return
+    table = Table(box=box.SIMPLE, title=f"Last {min(limit, len(pf.history))} trades")
+    for col in ("Time (UTC)", "Ticker", "Side", "Qty", "Fill Price", "Mode"):
+        table.add_column(col)
+    for trade in pf.history[-limit:]:
+        table.add_row(
+            trade["timestamp"],
+            trade["ticker"],
+            trade["side"],
+            f"{trade['quantity']:g}",
+            f"${trade['fill_price']:,.2f}",
+            trade["mode"],
+        )
+    console.print(table)
+
+
 def run_repl() -> None:
     _welcome()
 
@@ -164,6 +220,14 @@ def run_repl() -> None:
         if lower in ("help", "?", "h"):
             for t in TIPS:
                 console.print(f"  [dim]·[/] {t}")
+            continue
+
+        if lower == "portfolio":
+            _print_portfolio()
+            continue
+
+        if lower == "history":
+            _print_history()
             continue
 
         # Treat as task prompt
@@ -193,6 +257,8 @@ def _build_parser() -> argparse.ArgumentParser:
         epilog="""
 Commands (when running the REPL):
   <task>     Run a task (e.g. 'Analyze NVDA for 50k allocation')
+  portfolio  Show paper trading cash, equity, and open positions
+  history    Show recent paper trades
   help, ?, h Show in-REPL tips
   quit, exit, q  Exit the REPL
 

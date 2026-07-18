@@ -96,6 +96,40 @@ def _safe_financials(ticker: yf.Ticker) -> dict[str, Any]:
     return out
 
 
+def get_last_price(ticker: str) -> float:
+    """
+    Return the last traded price for `ticker` as a plain float.
+
+    Unlike the other functions in this module, this is a deterministic
+    helper meant to be called directly by orchestration code (not as an
+    LLM tool) so numeric price data used for position sizing and risk
+    checks is never something an agent could omit, hallucinate, or round
+    off while summarizing a large quote payload.
+
+    Raises
+    ------
+    ValueError
+        If no price data is available for the ticker.
+    """
+    symbol = ticker.strip().upper()
+    t = yf.Ticker(symbol)
+    try:
+        fast = t.fast_info
+        price = fast.get("last_price") if hasattr(fast, "get") else getattr(
+            fast, "last_price", None
+        )
+        if price:
+            return float(price)
+    except Exception as e:
+        logger.debug("fast_info lookup failed for {}: {}", symbol, e)
+
+    hist = t.history(period="5d", interval="1d")
+    if hist is not None and not hist.empty:
+        return float(hist["Close"].iloc[-1])
+
+    raise ValueError(f"no price data available for {symbol}")
+
+
 def get_stock_quote(ticker: str) -> str:
     """
     Get current quote for a symbol (price, volume, day range, etc.).
