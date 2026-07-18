@@ -204,7 +204,7 @@ def run_repl() -> None:
         try:
             prompt = Text("> ", style="bold cyan")
             console.print(prompt, end="")
-            line = input().strip()
+            line = input().lstrip("﻿").strip()
         except (EOFError, KeyboardInterrupt):
             console.print("\n[dim]Goodbye.[/]")
             break

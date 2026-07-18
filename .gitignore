@@ -10,6 +10,9 @@ __pycache__/
 
 # Distribution / packaging
 agent_workspace
+
+# Paper trading ledger / run logs (per-user runtime state)
+outputs/
 .Python
 build/
 develop-eggs/
