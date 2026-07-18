@@ -163,6 +163,21 @@ class AutoHedge:
             result["error"] = f"execution order generation failed: {e}"
             return result
 
+        # Position size, entry price, stop loss, and take profit are all
+        # arithmetic we already know exactly (risk_decision and the live
+        # quote) -- don't trust the LLM to reproduce that math. Seen in
+        # practice: the agent computed `quantity` from a self-invented
+        # entry_price instead of the real current_price it was given,
+        # silently oversizing the fill ~3-4% past the approved risk
+        # budget. Only side/order_type/time_in_force are genuinely the
+        # agent's call.
+        order.entry_price = quant.current_price
+        order.quantity = round(
+            risk_decision.position_size_usd / quant.current_price, 4
+        )
+        order.stop_loss = risk_decision.stop_loss_price
+        order.take_profit = risk_decision.take_profit_price
+
         violation = self._validate_order_against_risk(
             order, thesis, risk_decision, quant.current_price
         )

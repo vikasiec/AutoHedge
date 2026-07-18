@@ -134,7 +134,7 @@ class TestAutoHedgePipeline(unittest.TestCase):
     @patch("autohedge.main.quant_agent")
     @patch("autohedge.main.director_agent")
     @patch("autohedge.main.ticker_discovery_agent")
-    def test_execution_agent_exceeding_position_size_is_rejected(
+    def test_execution_agent_math_is_overridden_not_trusted(
         self,
         mock_discovery,
         mock_director,
@@ -142,21 +142,34 @@ class TestAutoHedgePipeline(unittest.TestCase):
         mock_execution,
         _mock_price,
     ):
-        oversized_order = json.loads(ORDER_JSON_TEMPLATE)
-        oversized_order["quantity"] = 10_000.0  # far beyond approved size
+        # Reproduces a real failure: the execution agent computed
+        # `quantity` from its own invented entry_price instead of the
+        # real current_price it was given, oversizing the actual fill
+        # past the approved risk budget. quantity/entry_price/stop_loss/
+        # take_profit are arithmetic we already know exactly, so they
+        # must always be overridden from risk_decision + the live quote
+        # regardless of what the agent returns.
+        bad_math_order = json.loads(ORDER_JSON_TEMPLATE)
+        bad_math_order["entry_price"] = 90.0  # invented, not the real 100.0
+        bad_math_order["quantity"] = 111.11  # 10_000 / 90.0 -- wrong basis
+        bad_math_order["stop_loss"] = 85.0  # doesn't match risk_decision's 90.0
         mock_discovery.run.return_value = '["NVDA"]'
         mock_director.run.return_value = THESIS_JSON
         mock_director.agent_name = "Trading-Director"
         mock_quant.run.return_value = QUANT_JSON
         mock_quant.agent_name = "Quant-Analyst"
-        mock_execution.run.return_value = json.dumps(oversized_order)
+        mock_execution.run.return_value = json.dumps(bad_math_order)
         mock_execution.agent_name = "Execution-Agent"
 
         results = self.system.run("Analyze NVDA")
 
-        self.assertIn("error", results[0])
-        self.assertIn("exceeds approved position size", results[0]["error"])
-        self.assertFalse(self.system.portfolio.has_position("NVDA"))
+        self.assertEqual(results[0]["status"], "filled")
+        order = results[0]["order"]
+        self.assertEqual(order["entry_price"], 100.0)
+        self.assertEqual(order["quantity"], 100.0)  # 10_000 / 100.0
+        self.assertEqual(order["stop_loss"], 90.0)
+        self.assertEqual(order["take_profit"], 120.0)
+        self.assertEqual(results[0]["fill"]["fill_price"], 100.0)
 
     @patch("autohedge.main.ticker_discovery_agent")
     def test_ticker_discovery_failure_surfaces_the_real_reason(

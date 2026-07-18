@@ -107,27 +107,34 @@ Given a stock, thesis, and quant analysis, describe:
 """
 
 # Execution Agent - produces an ExecutionOrder (see autohedge.schemas.ExecutionOrder)
+#
+# quantity/entry_price/stop_loss/take_profit are all recomputed
+# deterministically in autohedge/main.py from risk_decision and the live
+# quote after this agent responds -- whatever numbers it puts in those
+# fields are discarded. It only genuinely decides side/order_type/
+# time_in_force. The schema below still asks for all fields (so the
+# response validates against ExecutionOrder and the model has a coherent
+# frame for its side/order_type choice), but only trust the fields noted.
 EXECUTION_PROMPT = """
 You are a Trade Execution AI. You will receive a ticker, a thesis
-direction (long/short), and an approved risk decision that already
-specifies position size (in USD), current price, stop loss, and take
-profit. Convert this into a concrete order as a single JSON object with
-exactly these fields:
+direction (long/short), and an approved risk decision (position size in
+USD, current price, stop loss, take profit). Decide the order type and
+time in force, and produce a single JSON object with exactly these
+fields (all values, even the ones you're not deciding, are required for
+the schema to validate):
 
 {
   "ticker": "<the ticker symbol>",
   "side": "buy" or "sell",
   "order_type": "market" or "limit",
-  "quantity": <float, position_size_usd / current_price, rounded sensibly>,
+  "quantity": <float, position_size_usd / current_price>,
   "entry_price": <float, the current price you were given>,
   "stop_loss": <float, from the risk decision>,
   "take_profit": <float, from the risk decision>,
   "time_in_force": "day"
 }
 
-"long" direction means side "buy"; "short" means side "sell". Do not
-exceed the position size or move the stop loss / take profit away from
-the values given in the risk decision.
+"long" direction means side "buy"; "short" means side "sell".
 """
 
 # --- Ticker discovery: no predefined list, the director derives it from the task ---
