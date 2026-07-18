@@ -79,8 +79,8 @@ set:
 
 ```bash
 GEMINI_API_KEY=
-AUTOHEDGE_MODEL=gemini/gemini-2.5-flash
-AUTOHEDGE_LIGHT_MODEL=gemini/gemini-2.5-flash
+AUTOHEDGE_MODEL=gemini/gemini-3.5-flash
+AUTOHEDGE_LIGHT_MODEL=gemini/gemini-3.5-flash
 ```
 
 No code changes needed — `autohedge/workers.py` reads `AUTOHEDGE_MODEL`
@@ -113,6 +113,22 @@ results = system.run("Analyze NVDA for a swing trade")
 
 Each ticker's result includes the thesis, quant analysis, risk decision
 (with rejection reasons if declined), and the fill if one occurred.
+
+### Web dashboard
+
+```bash
+pip install -r ui/requirements.txt
+streamlit run ui/app.py
+```
+
+Opens at `http://localhost:8501` with four tabs: Run Pipeline (trigger a
+real cycle and see thesis/quant/risk/execution/fill per ticker),
+Portfolio, History, and Live Trading. The Live Trading tab is a thin
+front end over `autohedge/live.py` — it only becomes usable if
+`AUTOHEDGE_ENABLE_LIVE_TRADING=I_UNDERSTAND_THIS_IS_REAL_MONEY` is
+already set in the environment the Streamlit server was launched from
+(the UI cannot set this itself), and the execute button stays disabled
+until you type an exact confirmation phrase.
 
 ---
 

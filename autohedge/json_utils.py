@@ -10,7 +10,6 @@ once (feeding the validation error back to the agent) before giving up.
 from __future__ import annotations
 
 import json
-import re
 from typing import Type, TypeVar
 
 from loguru import logger
@@ -18,7 +17,7 @@ from pydantic import BaseModel, ValidationError
 
 ModelT = TypeVar("ModelT", bound=BaseModel)
 
-_JSON_BLOCK_RE = re.compile(r"\{.*\}|\[.*\]", re.DOTALL)
+_decoder = json.JSONDecoder()
 
 
 class JsonParseError(RuntimeError):
@@ -26,17 +25,28 @@ class JsonParseError(RuntimeError):
 
 
 def extract_json(text: str) -> dict | list:
-    text = text.strip()
-    try:
-        return json.loads(text)
-    except json.JSONDecodeError:
-        pass
+    """
+    Parse the first complete JSON value out of `text`, ignoring anything
+    before or after it.
 
-    match = _JSON_BLOCK_RE.search(text)
-    if not match:
+    LLMs sometimes wrap the JSON in markdown fences, add stray
+    commentary, or -- particularly "thinking" models -- echo the same
+    answer twice in one response. A naive `json.loads(text)` fails on
+    all of these, and a greedy regex from the first `{` to the *last*
+    `}` breaks specifically on the double-answer case (it spans both
+    objects, producing invalid JSON). `JSONDecoder.raw_decode` parses
+    exactly one JSON value starting at a given index and reports where
+    it ended, so trailing content -- including a full duplicate object
+    -- is simply ignored rather than corrupting the parse.
+    """
+    stripped = text.strip()
+    start = next((i for i, ch in enumerate(stripped) if ch in "{["), None)
+    if start is None:
         raise JsonParseError(f"no JSON object/array found in: {text[:300]!r}")
+
     try:
-        return json.loads(match.group(0))
+        value, _end = _decoder.raw_decode(stripped, start)
+        return value
     except json.JSONDecodeError as e:
         raise JsonParseError(f"invalid JSON in agent response: {e}") from e
 
