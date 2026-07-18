@@ -13,13 +13,14 @@ from rich.columns import Columns
 from rich.table import Table
 from rich import box
 
-from autohedge.env_loader import load_env, require_openai_key
+from autohedge.env_loader import load_env, require_llm_key
 from autohedge.portfolio import PaperPortfolio
 
 load_env()
-if not require_openai_key():
+if not require_llm_key():
     Console().print(
-        "[yellow]Warning: OPENAI_API_KEY not set. Set it in .env or export it.[/]"
+        "[yellow]Warning: no LLM API key set (OPENAI_API_KEY or "
+        "GEMINI_API_KEY). Set one in .env or export it.[/]"
     )
 
 try:

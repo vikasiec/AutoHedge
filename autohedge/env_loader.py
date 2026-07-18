@@ -27,6 +27,12 @@ def load_env() -> None:
         load_dotenv()
 
 
-def require_openai_key() -> bool:
-    """Return True if OPENAI_API_KEY is set (required for swarms gpt-4.x)."""
-    return bool(os.getenv("OPENAI_API_KEY"))
+def require_llm_key() -> bool:
+    """
+    Return True if a usable LLM provider key is set.
+
+    Which key is actually required depends on AUTOHEDGE_MODEL (see
+    autohedge/workers.py): OPENAI_API_KEY for the default "gpt-*"
+    models, GEMINI_API_KEY for "gemini/*" models.
+    """
+    return bool(os.getenv("OPENAI_API_KEY") or os.getenv("GEMINI_API_KEY"))

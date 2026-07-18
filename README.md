@@ -61,7 +61,7 @@ pip install -e .
 ### Environment Variables
 
 ```bash
-# Required for the LLM agents
+# Required for the LLM agents (default provider is OpenAI)
 OPENAI_API_KEY=
 
 # Optional: raises Jupiter API rate limits for the (unwired) live-trading tools
@@ -70,6 +70,22 @@ JUPITER_API_KEY=
 # Only needed if you explicitly call autohedge.live.execute_live_swap yourself
 SOLANA_PRIVATE_KEY=
 ```
+
+### Switching LLM provider (e.g. to Gemini)
+
+All agent calls route through `swarms` -> LiteLLM, which already supports
+other providers by model name prefix. To use Gemini instead of OpenAI,
+set:
+
+```bash
+GEMINI_API_KEY=
+AUTOHEDGE_MODEL=gemini/gemini-2.5-flash
+AUTOHEDGE_LIGHT_MODEL=gemini/gemini-2.5-flash
+```
+
+No code changes needed — `autohedge/workers.py` reads `AUTOHEDGE_MODEL`
+(used by Director/Quant/Execution/Risk/Ticker-Discovery) and
+`AUTOHEDGE_LIGHT_MODEL` (used by the Sentiment agent) at import time.
 
 See `.env.example` for the full list.
 

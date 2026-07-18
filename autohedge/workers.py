@@ -8,6 +8,7 @@ in plain, testable Python rather than inside the LLM framework's own
 routing.
 """
 
+import os
 from datetime import datetime
 
 from swarms import Agent
@@ -35,10 +36,17 @@ _JSON_ONLY_SUFFIX = (
     "schema. No markdown fences, no commentary before or after the JSON."
 )
 
+# All agents run through swarms -> LiteLLM, which routes by model name
+# prefix (e.g. "gpt-*" -> OpenAI via OPENAI_API_KEY, "gemini/*" -> Gemini
+# via GEMINI_API_KEY). Set AUTOHEDGE_MODEL to switch providers without
+# touching agent definitions.
+MODEL_NAME = os.getenv("AUTOHEDGE_MODEL", "gpt-4.1")
+LIGHT_MODEL_NAME = os.getenv("AUTOHEDGE_LIGHT_MODEL", "gpt-4o-mini")
+
 sentiment_agent = Agent(
     agent_name="Sentiment-Agent",
     system_prompt=SENTIMENT_PROMPT + _SYSTEM_SUFFIX,
-    model_name="gpt-4o-mini",
+    model_name=LIGHT_MODEL_NAME,
     verbose=True,
     max_loops=1,
     tools=[exa_search],
@@ -47,7 +55,7 @@ sentiment_agent = Agent(
 director_agent = Agent(
     agent_name="Trading-Director",
     system_prompt=DIRECTOR_PROMPT + _SYSTEM_SUFFIX + _JSON_ONLY_SUFFIX,
-    model_name="gpt-4.1",
+    model_name=MODEL_NAME,
     max_loops=1,
     tools=[exa_search],
 )
@@ -55,14 +63,14 @@ director_agent = Agent(
 ticker_discovery_agent = Agent(
     agent_name="Ticker-Discovery",
     system_prompt=DIRECTOR_TICKER_DISCOVERY_PROMPT + _SYSTEM_SUFFIX,
-    model_name="gpt-4.1",
+    model_name=MODEL_NAME,
     max_loops=1,
 )
 
 quant_agent = Agent(
     agent_name="Quant-Analyst",
     system_prompt=QUANT_PROMPT + _SYSTEM_SUFFIX + _JSON_ONLY_SUFFIX,
-    model_name="gpt-4.1",
+    model_name=MODEL_NAME,
     output_type="str",
     max_loops=1,
     verbose=True,
@@ -73,7 +81,7 @@ quant_agent = Agent(
 execution_agent = Agent(
     agent_name="Execution-Agent",
     system_prompt=EXECUTION_PROMPT + _SYSTEM_SUFFIX + _JSON_ONLY_SUFFIX,
-    model_name="gpt-4.1",
+    model_name=MODEL_NAME,
     output_type="str",
     max_loops=1,
     verbose=True,
@@ -85,7 +93,7 @@ execution_agent = Agent(
 risk_agent = Agent(
     agent_name="Risk-Manager",
     system_prompt=RISK_PROMPT + _SYSTEM_SUFFIX,
-    model_name="gpt-4.1",
+    model_name=MODEL_NAME,
     output_type="str",
     max_loops=1,
     verbose=True,
