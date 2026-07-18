@@ -130,6 +130,41 @@ def get_last_price(ticker: str) -> float:
     raise ValueError(f"no price data available for {symbol}")
 
 
+def get_market_snapshot(ticker: str) -> dict:
+    """
+    Return a small, prompt-friendly dict of real market data: current
+    price, recent range, and volume. Deterministic helper for
+    orchestration code -- meant to be embedded directly into an agent's
+    prompt text, not offered to the agent as a callable tool (see
+    autohedge/workers.py for why agent-driven tool calls are avoided in
+    this pipeline).
+
+    Raises
+    ------
+    ValueError
+        If no price/history data is available for the ticker.
+    """
+    symbol = ticker.strip().upper()
+    t = yf.Ticker(symbol)
+    price = get_last_price(symbol)
+
+    hist = t.history(period="1mo", interval="1d")
+    if hist is None or hist.empty:
+        raise ValueError(f"no history data available for {symbol}")
+
+    return {
+        "symbol": symbol,
+        "current_price": round(price, 4),
+        "volume": int(hist["Volume"].iloc[-1]),
+        "avg_volume_1mo": int(hist["Volume"].mean()),
+        "high_1mo": round(float(hist["High"].max()), 4),
+        "low_1mo": round(float(hist["Low"].min()), 4),
+        "prev_close": round(float(hist["Close"].iloc[-2]), 4)
+        if len(hist) > 1
+        else round(price, 4),
+    }
+
+
 def get_stock_quote(ticker: str) -> str:
     """
     Get current quote for a symbol (price, volume, day range, etc.).

@@ -13,7 +13,7 @@ from autohedge.schemas import (
     RiskDecision,
     Thesis,
 )
-from autohedge.tools.yahoo_api import get_last_price
+from autohedge.tools.yahoo_api import get_market_snapshot
 from autohedge.workers import (
     director_agent,
     execution_agent,
@@ -88,10 +88,18 @@ class AutoHedge:
         result["thesis"] = thesis.model_dump()
 
         try:
+            snapshot = get_market_snapshot(ticker)
+        except Exception as e:
+            result["error"] = f"could not fetch live market data: {e}"
+            return result
+
+        try:
             quant = run_agent_json(
                 quant_agent,
                 QUANT_ANALYSIS_PROMPT.format(
-                    stock=ticker, thesis=thesis.summary
+                    stock=ticker,
+                    thesis=thesis.summary,
+                    market_data=json.dumps(snapshot),
                 ),
                 QuantAnalysis,
             )
@@ -100,22 +108,18 @@ class AutoHedge:
             result["error"] = f"quant analysis failed: {e}"
             return result
 
-        try:
-            real_price = get_last_price(ticker)
-            drift = abs(real_price - quant.current_price) / real_price
-            if drift > _PRICE_TOLERANCE:
-                logger.warning(
-                    "{}: quant current_price {} drifted {:.1%} from live "
-                    "price {}; using live price",
-                    ticker,
-                    quant.current_price,
-                    drift,
-                    real_price,
-                )
-            quant.current_price = real_price
-        except Exception as e:
-            result["error"] = f"could not fetch live price: {e}"
-            return result
+        real_price = snapshot["current_price"]
+        drift = abs(real_price - quant.current_price) / real_price
+        if drift > _PRICE_TOLERANCE:
+            logger.warning(
+                "{}: quant current_price {} drifted {:.1%} from live "
+                "price {}; using live price",
+                ticker,
+                quant.current_price,
+                drift,
+                real_price,
+            )
+        quant.current_price = real_price
         result["quant"] = quant.model_dump()
 
         self.portfolio.update_price(ticker, quant.current_price)

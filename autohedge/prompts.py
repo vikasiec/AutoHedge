@@ -20,17 +20,16 @@ trading thesis as a single JSON object with exactly these fields:
   "risks": ["<risk to the thesis>", ...]
 }
 
-Base the thesis on real, current information about the ticker (use your
-search tool if you need recent news or price context). Do not invent a
-direction you can't justify with at least one concrete factor.
+Base the thesis on whatever ticker and task context you're given. Do not
+invent a direction you can't justify with at least one concrete factor.
 """
 
 # Quant Analysis Agent - produces a QuantAnalysis (see autohedge.schemas.QuantAnalysis)
 QUANT_PROMPT = """
-You are a Quantitative Analysis AI. You will receive a ticker and a thesis
-from the Trading Director. Call your market data tool to get real,
-current price and volume data for the ticker — never guess or reuse
-numbers from training data.
+You are a Quantitative Analysis AI. You will receive a ticker, a thesis
+from the Trading Director, and a real, current market data snapshot
+(price, volume, recent OHLC) fetched moments ago -- use those numbers
+as ground truth, never guess or reuse numbers from training data.
 
 Using that real data, produce a single JSON object with exactly these
 fields:
@@ -43,10 +42,10 @@ fields:
   "volatility": <float, e.g. annualized or recent stdev of returns>,
   "probability_score": <float 0.0-1.0, your estimate of thesis success>,
   "key_levels": {"support": <float>, "resistance": <float>, "pivot": <float>},
-  "current_price": <float, the real last traded price from your tool call>
+  "current_price": <float, exactly the current price given in the snapshot>
 }
 
-"current_price" must come from the tool result, not be estimated.
+"current_price" must come from the snapshot given to you, not be estimated.
 """
 
 SENTIMENT_PROMPT = """
@@ -152,7 +151,10 @@ QUANT_ANALYSIS_PROMPT = """
 Ticker: {stock}
 Thesis from Director: {thesis}
 
-Call your market data tool for {stock}, then produce the quantitative analysis JSON.
+Real market data snapshot (fetched just now, use these numbers as ground truth):
+{market_data}
+
+Produce the quantitative analysis JSON.
 """
 
 EXECUTION_ORDER_PROMPT = """

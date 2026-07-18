@@ -1,6 +1,6 @@
 """
 End-to-end orchestration tests for AutoHedge.run(), with the LLM agents
-and live price lookup mocked out. This exercises the real control flow
+and live market data lookup mocked out. This exercises the real control flow
 (director -> quant -> RiskEngine -> execution -> paper fill) without
 making any network or LLM calls.
 """
@@ -68,7 +68,7 @@ class TestAutoHedgePipeline(unittest.TestCase):
     def tearDown(self):
         self.tmpdir.cleanup()
 
-    @patch("autohedge.main.get_last_price", return_value=100.0)
+    @patch("autohedge.main.get_market_snapshot", return_value={"symbol": "NVDA", "current_price": 100.0, "volume": 1000, "avg_volume_1mo": 900, "high_1mo": 110.0, "low_1mo": 90.0, "prev_close": 99.0})
     @patch("autohedge.main.execution_agent")
     @patch("autohedge.main.quant_agent")
     @patch("autohedge.main.director_agent")
@@ -102,7 +102,7 @@ class TestAutoHedgePipeline(unittest.TestCase):
         self.assertTrue(self.system.portfolio.has_position("NVDA"))
         self.assertLess(self.system.portfolio.cash, 100_000.0)
 
-    @patch("autohedge.main.get_last_price", return_value=100.0)
+    @patch("autohedge.main.get_market_snapshot", return_value={"symbol": "NVDA", "current_price": 100.0, "volume": 1000, "avg_volume_1mo": 900, "high_1mo": 110.0, "low_1mo": 90.0, "prev_close": 99.0})
     @patch("autohedge.main.execution_agent")
     @patch("autohedge.main.quant_agent")
     @patch("autohedge.main.director_agent")
@@ -129,7 +129,7 @@ class TestAutoHedgePipeline(unittest.TestCase):
         self.assertFalse(mock_execution.run.called)
         self.assertFalse(self.system.portfolio.has_position("NVDA"))
 
-    @patch("autohedge.main.get_last_price", return_value=100.0)
+    @patch("autohedge.main.get_market_snapshot", return_value={"symbol": "NVDA", "current_price": 100.0, "volume": 1000, "avg_volume_1mo": 900, "high_1mo": 110.0, "low_1mo": 90.0, "prev_close": 99.0})
     @patch("autohedge.main.execution_agent")
     @patch("autohedge.main.quant_agent")
     @patch("autohedge.main.director_agent")
